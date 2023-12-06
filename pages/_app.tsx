@@ -18,7 +18,7 @@ if (typeof window !== "undefined") {
     context: {
       kind: "multi",
       user: {
-        key: "0",
+        key: Math.random().toString(36).substring(2, 6),
         name: "anonymous",
         betaModel: false
       },

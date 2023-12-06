@@ -1,4 +1,9 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { useFlags, useLDClient } from "launchdarkly-react-client-sdk";
 import { useCallback, useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -28,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useChat } from "ai/react";
+import { ThumbsDown, ThumbsUp } from "lucide-react";
 
 interface AiPrompt {
   [key: string]: string;
@@ -39,10 +45,11 @@ export default function Home() {
   const [model, setModel] = useState<string>("");
   const [query, setQuery] = useState<string>("");
   const [aiResponse, setAIResponse] = useState<string>("");
-  const [provider, setProvider] = useState("")
+  const [provider, setProvider] = useState("");
   const [loading, setLoading] = useState<boolean>(false);
   const [betaOptIn, setBetaOptIn] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
+  const [voted, setVoted] = useState<boolean>(true);
 
   const client = useLDClient();
 
@@ -57,17 +64,17 @@ export default function Home() {
       console.log(`The prompt is: ${prompt}`);
 
       switch (model) {
-        case 'cohere':
-          setProvider('cohere.command-text-v14');
+        case "cohere":
+          setProvider("cohere.command-text-v14");
           break;
-        case 'anthropic':
-          setProvider('anthropic.claude-v2');
+        case "anthropic":
+          setProvider("anthropic.claude-v2");
           break;
-        case 'AI21':
-          setProvider('ai21.j2-ultra-v1');
+        case "AI21":
+          setProvider("ai21.j2-ultra-v1");
           break;
         default:
-          console.log('No provider matched');
+          console.log("No provider matched");
       }
 
       setModel(model);
@@ -84,6 +91,7 @@ export default function Home() {
 
   useEffect(() => {
     setPromptInformation();
+    console.log("yup");
   }, [setPromptInformation]);
 
   const handleChange = useCallback((event: any) => {
@@ -124,7 +132,6 @@ export default function Home() {
           `HTTP error! status: ${response.status}. Check API Server Logs.`
         );
       }
-
       const data = await response.json();
       setAIResponse(data.text);
       console.log(data.text);
@@ -133,6 +140,7 @@ export default function Home() {
       console.error("An error occurred:", error);
     } finally {
       setLoading(false);
+      setVoted(false);
     }
   }
 
@@ -140,6 +148,7 @@ export default function Home() {
 
   useEffect(() => {
     console.log(messages);
+    console.log(voted)
   }, [messages]);
 
   async function updateContext(contextUpdate: any) {
@@ -164,6 +173,16 @@ export default function Home() {
     signOut();
   }
 
+  async function positive() {
+    await client?.track("Satisfied User");
+    setVoted(true);
+  }
+
+  async function negative() {
+    await client?.track("Unsatisfied User");
+    setVoted(true);
+  }
+
   useEffect(() => {
     console.log(aiprompts);
     try {
@@ -173,8 +192,9 @@ export default function Home() {
         const parsedContext = JSON.parse(context);
         parsedContext.user.email = session?.user?.email;
         parsedContext.user.name = session?.user?.name;
-        parsedContext.user.key = session?.user?.email?.slice(0, 5);
-        client?.identify(parsedContext);
+        // parsedContext.user.key = session?.user?.email?.slice(0, 5);
+        (parsedContext.user.key = Math.random().toString(36).substring(2, 6)),
+          client?.identify(parsedContext);
         setCookie("ldcontext", JSON.stringify(parsedContext));
         setBetaOptIn(parsedContext.user.betaModel);
       } else {
@@ -184,16 +204,22 @@ export default function Home() {
     } catch (error) {
       console.error("An error occurred:", error);
     }
-  });
+  }, []);
 
   return (
     <div className=" mx-2 xl:mx-32 pt-6 justify-center items-center">
       <div className="grid w-full place-items-center pt-8 pb-4">
         <p className="grid text-center text-6xl place-content-center font-bold banner">
-          Iterating on AI with LaunchDarkly and <span className="bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">AWS Bedrock</span>
-         </p>
+          Iterating on AI with LaunchDarkly and{" "}
+          <span className="bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+            AWS Bedrock
+          </span>
+        </p>
         <p className="grid p-4 w-2/3 text-lg place-content-center text-muted-foreground text-center ">
-          LaunchDarkly enables the control of integrations with AI providers at runtime, without requiring a code push to make changes every time. Iterate on releasing prompts or models, and measure the effectness of AI implementations.
+          LaunchDarkly enables the control of integrations with AI providers at
+          runtime, without requiring a code push to make changes every time.
+          Iterate on releasing prompts or models, and measure the effectness of
+          AI implementations.
         </p>
         {modelUsage && (
           <div className="grid w-1/2 m-2 border rounded-xl">
@@ -202,9 +228,10 @@ export default function Home() {
             </p>
             <p className="grid mb-4 font-bold text-2xl text-center lg:text-4xl uppercase bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
               {model}
-              
             </p>
-            <p className="grid mb-4 text-xl text-center lg:text-xl uppercase bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">{provider}</p>
+            <p className="grid mb-4 text-xl text-center lg:text-xl uppercase bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+              {provider}
+            </p>
           </div>
         )}
       </div>
@@ -342,6 +369,17 @@ export default function Home() {
                 )}
               </div>
             </CardContent>
+          )}
+          {voted === false && (
+            <CardFooter className="grid">
+              <div className="mx-auto pb-4">
+                <p className="text-2xl">Was this helpful?</p>
+              </div>
+              <div className="mx-auto flex flex-row gap-x-4">
+                <ThumbsUp onClick={positive} size={52} color="green" />
+                <ThumbsDown onClick={negative} size={52} color="red" />
+              </div>
+            </CardFooter>
           )}
         </Card>
       </div>
